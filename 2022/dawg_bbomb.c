@@ -27,7 +27,6 @@ typedef int (*pfunc)(char*, size_t);
 typedef void (*efunc)(void);
 const int NUM_EXPLODE_PHASES = 4;
 int CONTINUE_RUNNING = 1;
-const int NUM_PHASES = 1;
 
 /**
  * Phase ideas
@@ -49,8 +48,62 @@ void countdown(void);
 size_t getInput(char** input, size_t* buffLen, const char* format, ...);
 void explode();
 
+/* Phases */
+const int NUM_PHASES = 2;
+const char* PROMPTS[] = {
+    "Getting things started with stringing characters together...",
+    "I encoded by string so not one else could read it... but I lost the key!"
+};
+
+/* Solution: S7r1NgS_4rE_Co0L */
 int phase1(char* input, size_t inputLen) {
-    return 0;
+    char* flag = "S7r1NgS_4rE_Co0L";
+
+    return strncmp(input, flag, inputLen);
+}
+
+/* Solution: X0r_3nC1pHerm3nT_c4sCaD1nG */
+int phase2(char* input, size_t inputLen) {
+    char flag[] = {0x79, 0x53, 0x3c, 0x7d, 0x4c, 0x3c, 0x63, 0x50, 0x29, 0x3c, 0x06, 0x0e, 0x4f, 0x4c, 0x2b, 0x1a, 0x2d, 0x46, 0x56, 0x21, 0x33, 0x34, 0x64, 0x4e, 0x38, 0x56};
+
+    if(inputLen < 2) {
+        return 1;
+    }
+
+    for(int ii = 0; ii < inputLen-1; ii++) {
+        input[ii] = input[ii] ^ input[ii+1];
+        input[ii] ^= 0x11;
+    }
+
+    input[inputLen - 1] ^= 0x11;
+
+    printf("%s\n", input);
+
+    return strncmp(input, flag, inputLen);
+}
+
+char* func3_1(char* c) {
+    if(*c >= 'A' && *c <= 'Z') {
+        *c -= 13;
+        *c += 26*(*c < 'A');
+    }
+    if(*c >= 'a' && *c <= 'z') {
+        *c -= 13;
+        *c += 26*(*c < 'a');
+    }
+    return c;
+}
+
+char* func3_2(char* c) {
+    if(*c >= '!' && *c <= '~') {
+        *c -= 47;
+        *c += 94*(*c < '!');
+    }
+    return c;
+}
+
+int phase3(char* input, size_t inputLen) {
+
 }
 
 void phasePass(int round) {
@@ -74,10 +127,10 @@ void phasePass(int round) {
         sprintf(msg, "Onwards to phase %d!", round+1);
         break; 
     default:
-        sprintf(msg, "Nice work, but can you defeat phase %d!", rand() % NUM_PHASES + round + 1);
+        sprintf(msg, "Nice work, but can you defeat phase %d!", (rand() % (NUM_PHASES-round+1) + (round+1)));
         break;
     }
-    printf("%s\n", msg);
+    printf(GREEN "%s\n" RESET, msg);
     free(msg);
 }
 
@@ -96,7 +149,7 @@ void phaseFail(int round) {
         sprintf(msg, "Not quite...");
         break;
     case 3:
-        sprintf(msg, "Psst... that's the answer to phase %d!", rand() % NUM_PHASES+1);
+        sprintf(msg, "Psst... that's the answer to phase %d!", (rand() % (NUM_PHASES-round+1) + (round+1)));
         break;
     case 4:
         sprintf(msg, "oof");
@@ -114,13 +167,13 @@ void phaseFail(int round) {
         sprintf(msg, "Kaboom goes phase %d!", round);
         break;
     case 9:
-        sprintf(msg, RED "      _.__,_._\n    (_ '(`)_ .__)\n  ( ( (   ) `) ) _)\n (__(_ (_ . _)_),__)\n   `~~`\\ ' . /`~~`\n        ;   ;\n        /   \\\n ______/_ __ \\______" RESET);
+        sprintf(msg, "      _.__,_._\n    (_ '(`)_ .__)\n  ( ( (   ) `) ) _)\n (__(_ (_ . _)_),__)\n   `~~`\\ ' . /`~~`\n        ;   ;\n        /   \\\n ______/_ __ \\______");
         break;
     default:
         sprintf(msg, "3... 2... 1...");
         break;
     }
-    printf("%s\n", msg);
+    printf(RED "%s\n" RESET, msg);
     free(msg);
 }
 
@@ -256,15 +309,15 @@ void explode() {
         .tv_nsec = 0       /* nanoseconds */
     };
 
-    initscr();
-    cbreak();
-    start_color();
-    init_pair(NC_COUNTDOWN_RED, COLOR_RED, COLOR_BLACK);
-    init_pair(NC_BOMB_ANIMATION, COLOR_YELLOW, COLOR_BLACK);
-
     if(LINES < 30 || COLS < 80) {
         countdown();
     } else {
+        initscr();
+        cbreak();
+        start_color();
+        init_pair(NC_COUNTDOWN_RED, COLOR_RED, COLOR_BLACK);
+        init_pair(NC_BOMB_ANIMATION, COLOR_YELLOW, COLOR_BLACK);
+
         explodeHiss();
         attron(COLOR_PAIR(NC_BOMB_ANIMATION));
         for(int ii = 0; ii < NUM_EXPLODE_PHASES; ii++) {
@@ -277,6 +330,19 @@ void explode() {
         attroff(COLOR_PAIR(NC_BOMB_ANIMATION));
     }
     endwin();
+}
+
+void stripEOL(char* input, size_t* newLen, size_t maxLen) {
+    char* i = input;
+    *newLen = 0;
+    while(i && *newLen < maxLen) {
+        if(*i == '\n' || *i == '\r' || *i == '\0') {
+            *i = '\0';
+            break;
+        }
+        i++;
+        (*newLen)++;
+    }
 }
 
 size_t getInput(char** input, size_t* buffLen, const char* format, ...) {
@@ -294,36 +360,50 @@ size_t getInput(char** input, size_t* buffLen, const char* format, ...) {
     return inputLen;
 }
 
-void sigHandler(int sigNum) {
+void handler(int sigNum) {
     printf(RED "\nThought you could escape that easily?\n" RESET);
     explode();
-    ungetc('\n', stdin);
     CONTINUE_RUNNING = 0;
 }
 
 int main(int argc, char* argv[]) {
+    /* Setup */
+    srand(time(0));
+    struct sigaction sa;
+    sa.sa_handler = handler;
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, 0);
 
-    signal(SIGINT, sigHandler);
 
-    printf("Welcome to the DawgCTF Binary Bomb!\n");
-
-    pfunc phases[] = {phase1};
+    /* Variables */
+    pfunc phases[] = {phase1, phase2};
     int round = 1;
     int passed = 0;
     char* input = NULL;
-    size_t buffLen = 0;
+    size_t buffLen = 256;
     size_t inputLen = 0;
 
+    printf("Welcome to the DawgCTF Binary Bomb!\n");
+
     while(CONTINUE_RUNNING && round <= NUM_PHASES) {
-        inputLen = getInput(&input, &buffLen, "%s");
-        if(!strncmp(input, "SKIP\n", inputLen)) {
-            printf(GREEN "Skipping phase %d...\n" RESET, round);
+        printf(YELLOW "\n%s\n" RESET, PROMPTS[round-1]);
+        printf("Enter round %d input: ", round);
+        inputLen = getline(&input, &buffLen, stdin);
+        stripEOL(input, &inputLen, buffLen);
+
+        if(inputLen < 0) {
+            break;
+        }
+        
+        if(!strncmp(input, "SKIP", inputLen)) {
+            printf(RED "Skipping phase %d...\n" RESET, round);
             round++;
             continue;
         }
 
-        if(phases[round-1](input, inputLen)) {
+        if(!phases[round-1](input, inputLen)) {
             phasePass(round);
+            printf(MAGENTA "Flag: DawgCTF{%s}\n" RESET, input);
             passed++;
             round++;
         } else {
@@ -331,7 +411,15 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    free(input);
+    if(input) {
+        free(input);
+    }
+
+    if(passed == NUM_PHASES) {
+        printf("\nCongratulations! You defused the Binary Bomb - Dawg Edition!\n");
+    } else {
+        printf("\nYou've made it to the end, but some phases still remain active!\n");
+    }
 
     return 0;
 }
