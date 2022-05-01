@@ -252,6 +252,10 @@ int phase6(char* input, size_t inputLen) {
     }
     float expected[] = {1.625, 1.6176470588235294, 1.618034055727554, 1.6180339887543225};
 
+    if(i1 >= i3 || i3 >= i5 || i5 >= i7) {
+        return 1;
+    }
+
     if((float)i2/func4(i1) != expected[0]) {
         return 1;
     }
