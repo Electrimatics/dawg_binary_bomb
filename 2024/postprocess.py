@@ -1,6 +1,6 @@
 with open('dawg_bbomb', 'r+b') as binary:
-    start = int('2474', 16)
-    end = int('25c6', 16)
+    start = int('2484', 16)
+    end = int('25d6', 16)
 
     print("Modifying %x to %x" %(start, end))
     binary.seek(start)
