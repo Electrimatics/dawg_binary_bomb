@@ -44,6 +44,8 @@ typedef void (*hfunc)(char *, int);
 char helpstr[50];
 int maxFailPrompt = 10;
 
+char * printStore;  // Storing input to print later (if a phase modifies it)
+
 /* Explode sequences prototypes */
 void countdown(void);
 void explode(void);
@@ -122,7 +124,7 @@ void __libc_csu_entry(void) {
 const int NUM_PHASES = 6;
 const char *PROMPTS[] = {
     "Baby's first RE! What is this? This is my _____",
-    "Can you help me? I lost the keys to my string and can't read it :(",
+    "I lost the keys to my string and can't read it :(",
     "I've been spun around so much... my head kinda hurts now :/",
     "Now moving onto big strings!",
     "Slide to the right... Slide to the left... Take it back now!",
@@ -602,27 +604,33 @@ size_t getInput(FILE *flagFile, char **input) {
   return inputLen;
 }
 
-void help(void) {
+int help(void) {
+  int pass = -1;
   initscr();
   cbreak();
   noecho();
   move(0, 0);
 
-  printw("Welcome to the Binary Bomb - Dawg Edition!\n");
-  printw("A binary bomb is a series of small RE challenges, increasing in "
-         "difficulty each stage.\n");
-  printw("Each stage will prompt you for an input. If you are correct, the "
-         "flag will be displayed.\n");
-  printw("Once you solve a phase, you can store the solution in a text file "
-         "and use that file to automatically answer phases. \nUsage: "
-         "./dawg_bbomb [flag_file.txt]\n");
-  printw("The flag file must be in the format: 1 flag per line with a newline "
-         "ending\n");
-  printw("----\nphAse1_Fl4g\npHA5e2_FLag\nSKIP\n\nphaS35_Fl4g\n");
-  printw("----\n");
-  printw("If you want to skip a phase, answer the prompt with SKIP.\n");
-  printw("Good luck!  Press any key to continue... ");
-  refresh();
+    printw("-=- Welcome to the Binary Bomb - 2024 Dawg Edition! -=- \n"
+           "The idea behind this challenge is based on the CMU binary bomb lab.\n"
+           "\nA binary bomb is a series of small RE challenges increasing in difficulty each stage.\n"
+           "\nEach stage will print out a prompt and ask for user input. The input will be the solution for the phase as well as the flag for the CTF.\n"
+           "  If you are correct, a congratulatory message will be printed the flag will be displayed in the DawgCTF{FLAG} format. Then, you will advance to the next stage.\n"
+           "  If you are incorrect, a fail message will be printed, and you will have another attempt at the phase.\n"
+           "\nEach phase has an infinite number of attempts. Additionally, you may enter the following keywords at any phase:\n"
+           "  SKIP: Skips the current phase.\n"
+           "  HELP: Displays this help message.\n"
+           "\nYou may store the solutions for phases in a text file and use it to automatically answer phases. Enter one flag per line with a newline character ending.\n"
+           "For instance, if you knew the solutions for phases 1, 2, and 5, want to skip phase 3, and want to manually enter a solution for phase 4, your flags file will look like this:\n"
+           "----\n"
+           "phAse_1_Fl4g\n"
+           "pHA5e_2_FLag\n"
+           "SKIP\n"
+           "\n"
+           "phaS3_5_Fl4g\n"
+           "----\n"
+           "\nGood luck! Press any key to continue... ");
+    refresh();
 
   int c = getch();
   endwin();
@@ -630,20 +638,18 @@ void help(void) {
   /* Enter 'b' to access the bonus flag prompt */
   if (c == 'b' && maxFailPrompt != 11) {
     char *input = NULL;
-    printf(CYAN "Enter the bonus flag: " RESET);
+    printf(CYAN "> " RESET);
     size_t inputLen = getInput(NULL, &input);
-
-    if (!strncmp(helpstr, input, inputLen) && inputLen == strlen(helpstr)) {
-      printf(GREEN "Nice work!\n" RESET);
-      printf(MAGENTA "Flag: DawgCTF{%s}\n" RESET, input);
-    } else {
-      printf(RED "Not quite...\n" RESET);
-    }
+    printStore = (char *)realloc(printStore, sizeof(char) * inputLen + 1);
+    strncpy(printStore, input, inputLen + 1);
+    pass = !strncmp(helpstr, input, inputLen) && inputLen == strlen(helpstr);
 
     if (input) {
       free(input);
     }
   }
+
+  return pass;
 }
 
 void handler(int signo) {
@@ -677,9 +683,10 @@ int main(int argc, char *argv[]) {
   pfunc phases[] = {phase1, phase2, phase3, phase4, phase5, phase6};
   int round = 1;
   int passed = 0;
-  char *input = NULL;
-  char *inputStore = NULL;
+  char *input = NULL;       // User input
   size_t inputLen = 0;
+  int phaseClear = 0;
+  int wasBonusFlag = 0;
 
   printf("Welcome to the DawgCTF Binary Bomb!\n");
   printf("Type HELP for help.");
@@ -689,8 +696,8 @@ int main(int argc, char *argv[]) {
     printf("Enter round %d input: ", round);
 
     inputLen = getInput(flagFile, &input);
-    inputStore = (char *)realloc(inputStore, sizeof(char) * inputLen + 1);
-    strncpy(inputStore, input, inputLen + 1);
+    printStore = (char *)realloc(printStore, sizeof(char) * inputLen + 1);
+    strncpy(printStore, input, inputLen + 1);
 
     if (inputLen < 0) {
       break;
@@ -704,18 +711,25 @@ int main(int argc, char *argv[]) {
       printf(RED "Skipping phase %d...\n" RESET, round);
       round++;
       continue;
-    }
+    } 
 
     if (!strncmp(input, "HELP", inputLen)) {
-      help();
-      continue;
+      phaseClear = help();
+      if (phaseClear < 1) {
+        continue;
+      }
+      wasBonusFlag = 1;
+    } else {
+      phaseClear = phases[round - 1](input, inputLen);
     }
-
-    if (phases[round - 1](input, inputLen)) {
-      phasePass(round);
-      printf(MAGENTA "Flag: DawgCTF{%s}\n" RESET, inputStore);
-      passed++;
-      round++;
+    
+    if (phaseClear) {
+      if (!wasBonusFlag) {
+        phasePass(round);
+        passed++;
+        round++;
+      }
+      printf(MAGENTA "Flag: DawgCTF{%s}\n" RESET, printStore);
     } else {
       phaseFail(round);
     }
@@ -725,8 +739,8 @@ int main(int argc, char *argv[]) {
     free(input);
   }
 
-  if (inputStore) {
-    free(inputStore);
+  if (printStore) {
+    free(printStore);
   }
 
   if (flagFile) {
